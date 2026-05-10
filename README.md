@@ -1,36 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aegis
+
+**Secure Chat Messaging System**
+
+---
+
+Aegis is a secure, modern chat messaging system built primarily with TypeScript. It is designed to provide robust security, privacy, and a seamless messaging experience for users who prioritize confidentiality and ease of use.
+
+## Features
+
+- **End-to-End Encryption:** All messages are securely encrypted to ensure privacy.
+- **Real-Time Messaging:** Send and receive messages instantly with low latency.
+- **User Authentication:** Secure user login and registration system.
+- **Modern UI:** Responsive interface for both desktop and mobile devices.
+- **Cross-Platform:** Accessible from anywhere via your browser.
+- **Group and Private Chats:** Support for both individual and group conversations.
+- **Message History:** Access previous chats securely.
+- **Notifications:** Real-time alerts for new messages and activity.
+
+## Tech Stack
+
+- **TypeScript** (97.8%) – main application logic
+- **JavaScript** (1.2%) – auxiliary scripts
+- **CSS** (1%) – styling and layout
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (version >= 16)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Syynnc/Aegis.git
+cd Aegis
+```
+
+Install dependencies:
+
+```bash
+npm install
+# or
+yarn install
+```
+
+### Running the Application
+
+Start the development server:
 
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The application should now be running at [http://localhost:3000](http://localhost:3000) (or another configured port).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Building for Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+# or
+yarn build
+```
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+1. Register a new account or log in with your existing credentials.
+2. Start secure conversations with other verified users.
+3. Create group chats, send files (if supported), and enjoy encrypted communications.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Security
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Aegis prioritizes security by:
+- Encrypting all messages end-to-end
+- Ensuring secure authentication protocols
+- Using established cryptographic libraries and best practices
 
-## Deploy on Vercel
+_*Implementation details may be found within the respective source files and documentation.*
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Folder Structure (Typical)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+/src           # Main TypeScript source code
+/public        # Static assets
+/scripts       # JavaScript helper scripts
+/styles        # CSS files
+```
+
+## Contributing
+
+Contributions are welcome! To contribute:
+
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes
+4. Push to your branch and open a Pull Request
+
+Please follow the code of conduct and ensure all contributions are tested and documented.
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
+
+## Contact
+
+- **Repository Owner:** [Syynnc](https://github.com/Syynnc)
+- [Open Issues](https://github.com/Syynnc/Aegis/issues) for support or suggestions.
+
+---
+
+> **Aegis — Defending your privacy in the digital age.**
