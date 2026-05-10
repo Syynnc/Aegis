@@ -30,6 +30,13 @@ export function useRealtimeMessages({
   const [messages, setMessages] = useState<DecryptedMessage[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 
+  const addMessage = useCallback((msg: DecryptedMessage) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === msg.id)) return prev
+      return [...prev, msg]
+    })
+  }, [])
+
   // Keep a mutable ref to sharedKey so the realtime callback always
   // sees the latest value without needing to re-subscribe
   const keyRef = useRef<CryptoKey | null>(sharedKey)
@@ -83,14 +90,13 @@ export function useRealtimeMessages({
       .channel(`room:${roomId}:${Date.now()}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `room_id=eq.${roomId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages' },
         async (payload) => {
           const newMsg = payload.new as Message
+
+          // Filter client-side — more reliable than server-side filter
+          // which requires REPLICA IDENTITY FULL to be set
+          if (newMsg.room_id !== roomId) return
 
           let key = keyRef.current
 
@@ -168,5 +174,5 @@ export function useRealtimeMessages({
     }
   }, [roomId, currentUserId, onKeyExchanged, decryptAndVerify])
 
-  return { messages, loadingHistory }
+  return { messages, loadingHistory, addMessage }
 }

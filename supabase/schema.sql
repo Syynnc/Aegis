@@ -32,6 +32,10 @@ create table if not exists public.messages (
 create index if not exists messages_room_id_idx on public.messages(room_id);
 create index if not exists messages_created_at_idx on public.messages(created_at);
 
+-- Required for filtered postgres_changes subscriptions
+alter table public.messages replica identity full;
+alter table public.users replica identity full;
+
 -- Enable Row Level Security
 alter table public.users enable row level security;
 alter table public.chat_rooms enable row level security;
@@ -80,4 +84,5 @@ create policy "Users insert own messages"
   with check (auth.uid() = sender_id);
 
 -- Enable Realtime on messages and users tables
--- Supabase dashboard: Database > Replication > enable for messages and users tables
+alter publication supabase_realtime add table public.messages;
+alter publication supabase_realtime add table public.users;

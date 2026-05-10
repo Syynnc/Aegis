@@ -33,7 +33,7 @@ export default function ChatPage() {
     [setSharedKey, setOtherUser, setConnected, setStatusText]
   )
 
-  const { messages } = useRealtimeMessages({
+  const { messages, addMessage } = useRealtimeMessages({
     roomId,
     sharedKey,
     currentUserId: currentUser?.id ?? null,
@@ -45,13 +45,23 @@ export default function ChatPage() {
     if (!sharedKey || !currentUser || !roomId) return
     const { ciphertext, iv } = await encryptMessage(sharedKey, text)
     const hash = await hashMessage(text)
-    await supabase.from('messages').insert({
-      sender_id: currentUser.id,
-      room_id: roomId,
-      encrypted_message: ciphertext,
-      iv,
-      hash,
-    })
+
+    const { data } = await supabase
+      .from('messages')
+      .insert({
+        sender_id: currentUser.id,
+        room_id: roomId,
+        encrypted_message: ciphertext,
+        iv,
+        hash,
+      })
+      .select()
+      .single()
+
+    // Optimistically add own message — realtime deduplicates if the event also fires
+    if (data) {
+      addMessage({ ...data, plaintext: text, integrityVerified: true })
+    }
   }
 
   if (!currentUser) {
