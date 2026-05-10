@@ -16,7 +16,6 @@ interface UseRealtimeMessagesOptions {
   roomId: string | null
   sharedKey: CryptoKey | null
   currentUserId: string | null
-  otherUser: User | null
   onKeyExchanged: (key: CryptoKey, other: User) => void
 }
 
@@ -24,11 +23,17 @@ export function useRealtimeMessages({
   roomId,
   sharedKey,
   currentUserId,
-  otherUser,
   onKeyExchanged,
 }: UseRealtimeMessagesOptions) {
   const [messages, setMessages] = useState<DecryptedMessage[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [isOtherTyping, setIsOtherTyping] = useState(false)
+
+  const keyRef = useRef<CryptoKey | null>(sharedKey)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => { keyRef.current = sharedKey }, [sharedKey])
 
   const addMessage = useCallback((msg: DecryptedMessage) => {
     setMessages((prev) => {
@@ -37,10 +42,14 @@ export function useRealtimeMessages({
     })
   }, [])
 
-  // Keep a mutable ref to sharedKey so the realtime callback always
-  // sees the latest value without needing to re-subscribe
-  const keyRef = useRef<CryptoKey | null>(sharedKey)
-  useEffect(() => { keyRef.current = sharedKey }, [sharedKey])
+  const sendTyping = useCallback(() => {
+    if (!channelRef.current || !currentUserId) return
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: currentUserId },
+    })
+  }, [currentUserId])
 
   const decryptAndVerify = useCallback(
     async (msg: Message, key: CryptoKey): Promise<DecryptedMessage> => {
@@ -55,7 +64,7 @@ export function useRealtimeMessages({
     []
   )
 
-  // Load history whenever both roomId and sharedKey become available
+  // Load history when both roomId and sharedKey are ready
   useEffect(() => {
     if (!roomId || !sharedKey) return
 
@@ -79,100 +88,126 @@ export function useRealtimeMessages({
     loadHistory()
   }, [roomId, sharedKey, decryptAndVerify])
 
-  // Realtime subscription — only depends on roomId so it never re-subscribes
-  // when the sharedKey arrives later; it reads it from keyRef instead
+  // Realtime subscription
   useEffect(() => {
     if (!roomId || !currentUserId) return
 
-    supabase.removeAllChannels()
+    let channel: ReturnType<typeof supabase.channel>
 
-    const channel = supabase
-      .channel(`room:${roomId}:${Date.now()}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        async (payload) => {
-          const newMsg = payload.new as Message
+    async function subscribe() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
 
-          // Filter client-side — more reliable than server-side filter
-          // which requires REPLICA IDENTITY FULL to be set
-          if (newMsg.room_id !== roomId) return
+      supabase.realtime.setAuth(session.access_token)
 
-          let key = keyRef.current
+      channel = supabase
+        .channel(`room-${roomId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          async (payload) => {
+            const newMsg = payload.new as Message
+            if (newMsg.room_id !== roomId) return
 
-          // If the key isn't ready yet (other user hadn't joined when we subscribed),
-          // attempt a late key exchange now
-          if (!key) {
+            let key = keyRef.current
+
+            if (!key) {
+              const { data: { user: au } } = await supabase.auth.getUser()
+              if (!au) return
+              const privJwk = loadPrivateKey(au.id)
+              if (!privJwk) return
+
+              const { data: refreshedOther } = await supabase
+                .from('users')
+                .select('*')
+                .neq('id', au.id)
+                .limit(1)
+                .single()
+
+              if (!refreshedOther) return
+
+              try {
+                const priv = await importPrivateKey(privJwk)
+                const pub = await importPublicKey(refreshedOther.public_key)
+                key = await deriveSharedKey(priv, pub)
+                keyRef.current = key
+                onKeyExchanged(key, refreshedOther as User)
+              } catch {
+                return
+              }
+            }
+
+            const decrypted = await decryptAndVerify(newMsg, key)
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === decrypted.id)) return prev
+              return [...prev, decrypted]
+            })
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'users' },
+          async () => {
+            if (keyRef.current || !currentUserId) return
+
             const { data: { user: au } } = await supabase.auth.getUser()
             if (!au) return
             const privJwk = loadPrivateKey(au.id)
             if (!privJwk) return
 
-            const { data: refreshedOther } = await supabase
+            const { data: newOther } = await supabase
               .from('users')
               .select('*')
               .neq('id', au.id)
               .limit(1)
               .single()
 
-            if (!refreshedOther) return
+            if (!newOther) return
 
             try {
               const priv = await importPrivateKey(privJwk)
-              const pub = await importPublicKey(refreshedOther.public_key)
-              key = await deriveSharedKey(priv, pub)
+              const pub = await importPublicKey(newOther.public_key)
+              const key = await deriveSharedKey(priv, pub)
               keyRef.current = key
-              onKeyExchanged(key, refreshedOther as User)
+              onKeyExchanged(key, newOther as User)
             } catch {
-              return
+              /* ignore */
             }
           }
+        )
+        .on(
+          'broadcast',
+          { event: 'typing' },
+          ({ payload }: { payload: { userId: string } }) => {
+            // Only show indicator if it's from the other user
+            if (payload.userId === currentUserId) return
 
-          const decrypted = await decryptAndVerify(newMsg, key)
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === decrypted.id)) return prev
-            return [...prev, decrypted]
-          })
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'users' },
-        async () => {
-          // A new user registered — attempt key exchange if we don't have a key yet
-          if (keyRef.current || !currentUserId) return
+            setIsOtherTyping(true)
 
-          const { data: { user: au } } = await supabase.auth.getUser()
-          if (!au) return
-          const privJwk = loadPrivateKey(au.id)
-          if (!privJwk) return
-
-          const { data: newOther } = await supabase
-            .from('users')
-            .select('*')
-            .neq('id', au.id)
-            .limit(1)
-            .single()
-
-          if (!newOther) return
-
-          try {
-            const priv = await importPrivateKey(privJwk)
-            const pub = await importPublicKey(newOther.public_key)
-            const key = await deriveSharedKey(priv, pub)
-            keyRef.current = key
-            onKeyExchanged(key, newOther as User)
-          } catch {
-            /* ignore */
+            // Clear any existing timeout and reset the 2.5s window
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+            typingTimeoutRef.current = setTimeout(() => {
+              setIsOtherTyping(false)
+            }, 2500)
           }
-        }
-      )
-      .subscribe()
+        )
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR') {
+            console.error('[Aegis] Realtime subscription failed — check RLS policies and JWT')
+          }
+        })
+
+      channelRef.current = channel
+    }
+
+    subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+      if (channel) supabase.removeChannel(channel)
+      channelRef.current = null
     }
   }, [roomId, currentUserId, onKeyExchanged, decryptAndVerify])
 
-  return { messages, loadingHistory, addMessage }
+  return { messages, loadingHistory, addMessage, isOtherTyping, sendTyping }
 }

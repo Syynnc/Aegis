@@ -33,11 +33,10 @@ export default function ChatPage() {
     [setSharedKey, setOtherUser, setConnected, setStatusText]
   )
 
-  const { messages, addMessage } = useRealtimeMessages({
+  const { messages, addMessage, isOtherTyping, sendTyping } = useRealtimeMessages({
     roomId,
     sharedKey,
     currentUserId: currentUser?.id ?? null,
-    otherUser,
     onKeyExchanged: handleKeyExchanged,
   })
 
@@ -161,6 +160,8 @@ export default function ChatPage() {
             otherUser={otherUser}
             onSend={handleSend}
             connected={connected}
+            isOtherTyping={isOtherTyping}
+            onTyping={sendTyping}
           />
         </main>
       </div>
