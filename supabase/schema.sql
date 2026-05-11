@@ -24,6 +24,10 @@ create table if not exists public.chat_rooms (
   unique (user1_id, user2_id)
 );
 
+-- Add wrapped private key columns (run once; safe to re-run)
+alter table public.users add column if not exists encrypted_private_key text;
+alter table public.users add column if not exists key_salt text;
+
 -- Messages table
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),

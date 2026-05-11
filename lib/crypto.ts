@@ -101,3 +101,43 @@ export function base64ToArray(b64: string): Uint8Array<ArrayBuffer> {
       .map((c) => c.charCodeAt(0))
   )
 }
+
+export async function deriveWrappingKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  )
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: salt.buffer as ArrayBuffer, iterations: 310_000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+}
+
+export async function encryptPrivateKeyForStorage(
+  privateKeyJwk: string,
+  wrappingKey: CryptoKey
+): Promise<{ encrypted: string; iv: string }> {
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const encoded = new TextEncoder().encode(privateKeyJwk)
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrappingKey, encoded)
+  return { encrypted: arrayToBase64(new Uint8Array(encrypted)), iv: arrayToBase64(iv) }
+}
+
+export async function decryptPrivateKeyFromStorage(
+  encrypted: string,
+  iv: string,
+  wrappingKey: CryptoKey
+): Promise<string> {
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64ToArray(iv) },
+    wrappingKey,
+    base64ToArray(encrypted)
+  )
+  return new TextDecoder().decode(decrypted)
+}
