@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { generateKeyPair, exportPublicKey, exportPrivateKey } from '@/lib/crypto'
+import {
+  generateKeyPair, exportPublicKey, exportPrivateKey,
+  deriveWrappingKey, encryptPrivateKeyForStorage, decryptPrivateKeyFromStorage,
+} from '@/lib/crypto'
 import { savePrivateKey, loadPrivateKey } from '@/lib/helpers'
 import { supabase } from '@/lib/supabase'
 
@@ -47,10 +50,17 @@ export default function LoginPage() {
     const publicKeyJwk = await exportPublicKey(keyPair.publicKey)
     const privateKeyJwk = await exportPrivateKey(keyPair.privateKey)
 
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const wrappingKey = await deriveWrappingKey(password, salt)
+    const { encrypted: encryptedPrivKey, iv: privKeyIv } = await encryptPrivateKeyForStorage(privateKeyJwk, wrappingKey)
+    const saltB64 = btoa(String.fromCharCode(...salt))
+
     const { error: profileError } = await supabase.from('users').insert({
       id: userId,
       username: username.trim(),
       public_key: publicKeyJwk,
+      encrypted_private_key: encryptedPrivKey + ':' + privKeyIv,
+      key_salt: saltB64,
     })
 
     if (profileError) {
@@ -69,36 +79,51 @@ export default function LoginPage() {
 
     const userId = data.user.id
 
-    const keyPair = await generateKeyPair()
-    const publicKeyJwk = await exportPublicKey(keyPair.publicKey)
-    const privateKeyJwk = await exportPrivateKey(keyPair.privateKey)
-
-    // Check whether a profile row exists (it may have been wiped by a DB reset)
-    const { data: existingProfile } = await supabase
+    const { data: profile } = await supabase
       .from('users')
-      .select('id')
+      .select('id, encrypted_private_key, key_salt')
       .eq('id', userId)
       .maybeSingle()
 
-    if (!existingProfile) {
-      // Profile missing — the DB was reset but the auth account survived.
-      // Need a username: require the username field to be filled in.
+    if (!profile) {
+      // Profile missing — DB was reset but auth account survived.
       if (!username.trim()) {
         throw new Error('Your profile was reset. Please enter a username to recreate it.')
       }
+      const keyPair = await generateKeyPair()
+      const publicKeyJwk = await exportPublicKey(keyPair.publicKey)
+      const privateKeyJwk = await exportPrivateKey(keyPair.privateKey)
+
+      const salt = crypto.getRandomValues(new Uint8Array(16))
+      const wrappingKey = await deriveWrappingKey(password, salt)
+      const { encrypted: encryptedPrivKey, iv: privKeyIv } = await encryptPrivateKeyForStorage(privateKeyJwk, wrappingKey)
+      const saltB64 = btoa(String.fromCharCode(...salt))
+
       const { error: insertError } = await supabase.from('users').insert({
         id: userId,
         username: username.trim(),
         public_key: publicKeyJwk,
+        encrypted_private_key: encryptedPrivKey + ':' + privKeyIv,
+        key_salt: saltB64,
       })
       if (insertError) throw new Error(insertError.message)
       savePrivateKey(userId, privateKeyJwk)
+    } else if (profile.encrypted_private_key && profile.key_salt) {
+      // Normal sign-in: decrypt the stored private key using the user's password
+      try {
+        const saltBytes = new Uint8Array(atob(profile.key_salt).split('').map((c) => c.charCodeAt(0)))
+        const wrappingKey = await deriveWrappingKey(password, saltBytes)
+        const [encrypted, iv] = profile.encrypted_private_key.split(':')
+        const privateKeyJwk = await decryptPrivateKeyFromStorage(encrypted, iv, wrappingKey)
+        savePrivateKey(userId, privateKeyJwk)
+      } catch {
+        throw new Error('Wrong password or corrupted key — unable to decrypt your private key.')
+      }
     } else {
-      // Profile exists — only regenerate keys if private key is missing from localStorage
+      // Legacy account without stored wrapped key — fall back to localStorage only
       const existingPrivKey = loadPrivateKey(userId)
       if (!existingPrivKey) {
-        await supabase.from('users').update({ public_key: publicKeyJwk }).eq('id', userId)
-        savePrivateKey(userId, privateKeyJwk)
+        throw new Error('No private key found. Your account was created before key backup was supported. Please sign up again.')
       }
     }
 
@@ -164,8 +189,8 @@ export default function LoginPage() {
           </h2>
           <p className="text-slate-400 text-sm mb-6">
             {mode === 'signin'
-              ? 'Sign in to resume your encrypted session.'
-              : 'A new ECDH P-256 key pair will be generated for you.'}
+              ? 'Your private key is decrypted locally using your password.'
+              : 'A new ECDH P-256 key pair will be generated and encrypted with your password.'}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -184,7 +209,7 @@ export default function LoginPage() {
               />
               {mode === 'signin' && (
                 <p className="text-[11px] text-slate-600 mt-1.5">
-                  Only needed if your profile was reset.
+                  Only needed if your profile was reset (e.g. DB wipe).
                 </p>
               )}
             </div>
@@ -281,7 +306,7 @@ export default function LoginPage() {
               { label: 'Authentication', value: 'Supabase Auth' },
               { label: 'Key Exchange', value: 'ECDH P-256' },
               { label: 'Encryption', value: 'AES-256-GCM' },
-              { label: 'Integrity', value: 'SHA-256' },
+              { label: 'Key Backup', value: 'PBKDF2 + AES-GCM' },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between text-xs">
                 <span className="text-slate-500">{label}</span>
@@ -292,7 +317,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-slate-600 mt-6">
-          Private key generated in your browser · never transmitted to any server
+          Private key encrypted with your password · stored securely in the DB
         </p>
       </div>
     </div>

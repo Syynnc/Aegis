@@ -8,7 +8,7 @@ export function useOnlineUsers(currentUserId: string | null) {
   const [users, setUsers] = useState<OnlineUser[]>([])
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set())
 
-  // Load all registered users (excluding self)
+  // Load all registered users (excluding self) + watch for new registrations
   useEffect(() => {
     if (!currentUserId) return
 
@@ -25,6 +25,36 @@ export function useOnlineUsers(currentUserId: string | null) {
     }
 
     loadUsers()
+
+    const channel = supabase
+      .channel('users-inserts')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'users' },
+        (payload) => {
+          const newUser = payload.new as User
+          if (newUser.id === currentUserId) return
+          setUsers((prev) => {
+            if (prev.some((u) => u.id === newUser.id)) return prev
+            const inserted: OnlineUser = { ...newUser, isOnline: false }
+            return [...prev, inserted].sort((a, b) => a.username.localeCompare(b.username))
+          })
+          // Apply current online status in case the new user is already tracked by presence
+          setOnlineIds((ids) => {
+            if (ids.has(newUser.id)) {
+              setUsers((prev) =>
+                prev.map((u) => (u.id === newUser.id ? { ...u, isOnline: true } : u))
+              )
+            }
+            return ids
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [currentUserId])
 
   // Track presence — who is actively connected right now
