@@ -25,7 +25,6 @@ export function useRealtimeMessages({
 
   useEffect(() => { keyRef.current = sharedKey }, [sharedKey])
 
-  // Reset messages when room changes
   useEffect(() => {
     setMessages([])
     setIsOtherTyping(false)
@@ -47,6 +46,30 @@ export function useRealtimeMessages({
     })
   }, [currentUserId])
 
+  // Mark all unread incoming messages in the room as read
+  const markAsRead = useCallback(async (msgs: DecryptedMessage[]) => {
+    if (!currentUserId || !roomId) return
+
+    const unreadIds = msgs
+      .filter((m) => m.sender_id !== currentUserId && m.read_at === null)
+      .map((m) => m.id)
+
+    if (unreadIds.length === 0) return
+
+    await supabase
+      .from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .in('id', unreadIds)
+
+    // Update local state immediately so sender sees the receipt without waiting
+    // for the realtime UPDATE event to bounce back
+    setMessages((prev) =>
+      prev.map((m) =>
+        unreadIds.includes(m.id) ? { ...m, read_at: new Date().toISOString() } : m
+      )
+    )
+  }, [currentUserId, roomId])
+
   const decryptAndVerify = useCallback(
     async (msg: Message, key: CryptoKey): Promise<DecryptedMessage> => {
       try {
@@ -60,7 +83,7 @@ export function useRealtimeMessages({
     []
   )
 
-  // Load history whenever both roomId and sharedKey are ready
+  // Load history
   useEffect(() => {
     if (!roomId || !sharedKey) return
 
@@ -114,6 +137,21 @@ export function useRealtimeMessages({
           }
         )
         .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'messages' },
+          (payload) => {
+            const updated = payload.new as Message
+            if (updated.room_id !== roomId) return
+
+            // Patch just the read_at field on the matching message
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === updated.id ? { ...m, read_at: updated.read_at } : m
+              )
+            )
+          }
+        )
+        .on(
           'broadcast',
           { event: 'typing' },
           ({ payload }: { payload: { userId: string } }) => {
@@ -141,5 +179,5 @@ export function useRealtimeMessages({
     }
   }, [roomId, currentUserId, decryptAndVerify])
 
-  return { messages, addMessage, isOtherTyping, sendTyping }
+  return { messages, addMessage, isOtherTyping, sendTyping, markAsRead }
 }

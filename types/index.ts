@@ -17,6 +17,7 @@ export interface Message {
   iv: string
   hash: string
   created_at: string
+  read_at: string | null
   sender?: User
 }
 
