@@ -11,10 +11,17 @@ create table if not exists public.users (
   created_at timestamptz default now()
 );
 
--- Chat rooms table
+-- Private chat rooms — one room per ordered pair of users.
+-- user1_id is always the smaller UUID to enforce uniqueness regardless of
+-- which participant creates the room.
 create table if not exists public.chat_rooms (
   id uuid primary key default gen_random_uuid(),
-  created_at timestamptz default now()
+  user1_id uuid not null references auth.users(id) on delete cascade,
+  user2_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz default now(),
+  constraint chat_rooms_no_self_chat check (user1_id <> user2_id),
+  constraint chat_rooms_ordered       check (user1_id < user2_id),
+  unique (user1_id, user2_id)
 );
 
 -- Messages table
@@ -31,58 +38,79 @@ create table if not exists public.messages (
 -- Indexes
 create index if not exists messages_room_id_idx on public.messages(room_id);
 create index if not exists messages_created_at_idx on public.messages(created_at);
+create index if not exists chat_rooms_user1_idx on public.chat_rooms(user1_id);
+create index if not exists chat_rooms_user2_idx on public.chat_rooms(user2_id);
 
 -- Required for filtered postgres_changes subscriptions
 alter table public.messages replica identity full;
 alter table public.users replica identity full;
+alter table public.chat_rooms replica identity full;
 
 -- Enable Row Level Security
 alter table public.users enable row level security;
 alter table public.chat_rooms enable row level security;
 alter table public.messages enable row level security;
 
+-- -----------------------------------------------------------------------
 -- Users RLS
--- Anyone logged in can read user profiles (needed for key exchange)
+-- -----------------------------------------------------------------------
 create policy "Authenticated users can read profiles"
   on public.users for select
   to authenticated
   using (true);
 
--- Users can only insert their own profile row
 create policy "Users insert own profile"
   on public.users for insert
   to authenticated
   with check (auth.uid() = id);
 
--- Users can only update their own public key
 create policy "Users update own profile"
   on public.users for update
   to authenticated
   using (auth.uid() = id);
 
--- Chat rooms RLS
-create policy "Authenticated users can read rooms"
+-- -----------------------------------------------------------------------
+-- Chat rooms RLS — only the two participants can see or create their room
+-- -----------------------------------------------------------------------
+create policy "Members can read their rooms"
   on public.chat_rooms for select
   to authenticated
-  using (true);
+  using (auth.uid() = user1_id or auth.uid() = user2_id);
 
-create policy "Authenticated users can create rooms"
+create policy "Members can create their rooms"
   on public.chat_rooms for insert
   to authenticated
-  with check (true);
+  with check (auth.uid() = user1_id or auth.uid() = user2_id);
 
--- Messages RLS
-create policy "Authenticated users can read messages"
+-- -----------------------------------------------------------------------
+-- Messages RLS — only room members can read or write messages
+-- -----------------------------------------------------------------------
+create policy "Room members can read messages"
   on public.messages for select
   to authenticated
-  using (true);
+  using (
+    exists (
+      select 1 from public.chat_rooms
+      where id = room_id
+        and (user1_id = auth.uid() or user2_id = auth.uid())
+    )
+  );
 
--- Users can only send messages as themselves
-create policy "Users insert own messages"
+create policy "Users insert own messages in their rooms"
   on public.messages for insert
   to authenticated
-  with check (auth.uid() = sender_id);
+  with check (
+    auth.uid() = sender_id
+    and exists (
+      select 1 from public.chat_rooms
+      where id = room_id
+        and (user1_id = auth.uid() or user2_id = auth.uid())
+    )
+  );
 
--- Enable Realtime on messages and users tables
+-- -----------------------------------------------------------------------
+-- Realtime
+-- -----------------------------------------------------------------------
 alter publication supabase_realtime add table public.messages;
 alter publication supabase_realtime add table public.users;
+alter publication supabase_realtime add table public.chat_rooms;

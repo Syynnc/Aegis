@@ -12,6 +12,8 @@ interface ChatBoxProps {
   connected: boolean
   isOtherTyping: boolean
   onTyping: () => void
+  onBack?: () => void
+  roomStatus?: 'idle' | 'loading' | 'ready' | 'error'
 }
 
 export default function ChatBox({
@@ -22,6 +24,8 @@ export default function ChatBox({
   connected,
   isOtherTyping,
   onTyping,
+  onBack,
+  roomStatus,
 }: ChatBoxProps) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -48,9 +52,20 @@ export default function ChatBox({
     <div className="flex flex-col h-full">
       {/* Chat header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-950/50">
-        <div className="flex items-center gap-3">
-          {otherUser ? (
-            <>
+        <div className="flex items-center gap-2">
+          {/* Mobile back button */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+          )}
+          {otherUser && (
+            <div className="flex items-center gap-2.5">
               <div className="relative">
                 <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white uppercase">
                   {otherUser.username[0]}
@@ -64,12 +79,13 @@ export default function ChatBox({
               <div>
                 <p className="text-sm font-semibold text-white leading-tight">{otherUser.username}</p>
                 <p className="text-[11px] text-slate-500">
-                  {connected ? 'End-to-end encrypted' : 'Connecting…'}
+                  {roomStatus === 'loading' ? 'Establishing secure channel…'
+                    : roomStatus === 'error' ? 'Key exchange failed'
+                    : connected ? 'End-to-end encrypted'
+                    : 'Connecting…'}
                 </p>
               </div>
-            </>
-          ) : (
-            <p className="text-sm text-slate-500">Waiting for another user to join…</p>
+            </div>
           )}
         </div>
 

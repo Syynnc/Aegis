@@ -2,31 +2,21 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import {
-  importPrivateKey,
-  importPublicKey,
-  deriveSharedKey,
-  decryptMessage,
-  verifyMessageHash,
-} from '@/lib/crypto'
-import { loadPrivateKey } from '@/lib/helpers'
-import type { User, Message, DecryptedMessage } from '@/types'
+import { decryptMessage, verifyMessageHash } from '@/lib/crypto'
+import type { Message, DecryptedMessage } from '@/types'
 
 interface UseRealtimeMessagesOptions {
   roomId: string | null
   sharedKey: CryptoKey | null
   currentUserId: string | null
-  onKeyExchanged: (key: CryptoKey, other: User) => void
 }
 
 export function useRealtimeMessages({
   roomId,
   sharedKey,
   currentUserId,
-  onKeyExchanged,
 }: UseRealtimeMessagesOptions) {
   const [messages, setMessages] = useState<DecryptedMessage[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
   const [isOtherTyping, setIsOtherTyping] = useState(false)
 
   const keyRef = useRef<CryptoKey | null>(sharedKey)
@@ -34,6 +24,12 @@ export function useRealtimeMessages({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { keyRef.current = sharedKey }, [sharedKey])
+
+  // Reset messages when room changes
+  useEffect(() => {
+    setMessages([])
+    setIsOtherTyping(false)
+  }, [roomId])
 
   const addMessage = useCallback((msg: DecryptedMessage) => {
     setMessages((prev) => {
@@ -64,12 +60,11 @@ export function useRealtimeMessages({
     []
   )
 
-  // Load history when both roomId and sharedKey are ready
+  // Load history whenever both roomId and sharedKey are ready
   useEffect(() => {
     if (!roomId || !sharedKey) return
 
     async function loadHistory() {
-      setLoadingHistory(true)
       const { data } = await supabase
         .from('messages')
         .select('*')
@@ -82,7 +77,6 @@ export function useRealtimeMessages({
         )
         setMessages(decrypted)
       }
-      setLoadingHistory(false)
     }
 
     loadHistory()
@@ -109,33 +103,8 @@ export function useRealtimeMessages({
             const newMsg = payload.new as Message
             if (newMsg.room_id !== roomId) return
 
-            let key = keyRef.current
-
-            if (!key) {
-              const { data: { user: au } } = await supabase.auth.getUser()
-              if (!au) return
-              const privJwk = loadPrivateKey(au.id)
-              if (!privJwk) return
-
-              const { data: refreshedOther } = await supabase
-                .from('users')
-                .select('*')
-                .neq('id', au.id)
-                .limit(1)
-                .single()
-
-              if (!refreshedOther) return
-
-              try {
-                const priv = await importPrivateKey(privJwk)
-                const pub = await importPublicKey(refreshedOther.public_key)
-                key = await deriveSharedKey(priv, pub)
-                keyRef.current = key
-                onKeyExchanged(key, refreshedOther as User)
-              } catch {
-                return
-              }
-            }
+            const key = keyRef.current
+            if (!key) return
 
             const decrypted = await decryptAndVerify(newMsg, key)
             setMessages((prev) => {
@@ -145,55 +114,18 @@ export function useRealtimeMessages({
           }
         )
         .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'users' },
-          async () => {
-            if (keyRef.current || !currentUserId) return
-
-            const { data: { user: au } } = await supabase.auth.getUser()
-            if (!au) return
-            const privJwk = loadPrivateKey(au.id)
-            if (!privJwk) return
-
-            const { data: newOther } = await supabase
-              .from('users')
-              .select('*')
-              .neq('id', au.id)
-              .limit(1)
-              .single()
-
-            if (!newOther) return
-
-            try {
-              const priv = await importPrivateKey(privJwk)
-              const pub = await importPublicKey(newOther.public_key)
-              const key = await deriveSharedKey(priv, pub)
-              keyRef.current = key
-              onKeyExchanged(key, newOther as User)
-            } catch {
-              /* ignore */
-            }
-          }
-        )
-        .on(
           'broadcast',
           { event: 'typing' },
           ({ payload }: { payload: { userId: string } }) => {
-            // Only show indicator if it's from the other user
             if (payload.userId === currentUserId) return
-
             setIsOtherTyping(true)
-
-            // Clear any existing timeout and reset the 2.5s window
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-            typingTimeoutRef.current = setTimeout(() => {
-              setIsOtherTyping(false)
-            }, 2500)
+            typingTimeoutRef.current = setTimeout(() => setIsOtherTyping(false), 2500)
           }
         )
         .subscribe((status) => {
           if (status === 'CHANNEL_ERROR') {
-            console.error('[Aegis] Realtime subscription failed — check RLS policies and JWT')
+            console.error('[Aegis] Realtime subscription failed')
           }
         })
 
@@ -207,7 +139,7 @@ export function useRealtimeMessages({
       if (channel) supabase.removeChannel(channel)
       channelRef.current = null
     }
-  }, [roomId, currentUserId, onKeyExchanged, decryptAndVerify])
+  }, [roomId, currentUserId, decryptAndVerify])
 
-  return { messages, loadingHistory, addMessage, isOtherTyping, sendTyping }
+  return { messages, addMessage, isOtherTyping, sendTyping }
 }

@@ -69,21 +69,37 @@ export default function LoginPage() {
 
     const userId = data.user.id
 
-    // If private key is missing from localStorage (new device), generate a fresh key pair
-    // and update the public key in the DB so the other user can re-derive the shared key.
-    const existingPrivKey = loadPrivateKey(userId)
+    const keyPair = await generateKeyPair()
+    const publicKeyJwk = await exportPublicKey(keyPair.publicKey)
+    const privateKeyJwk = await exportPrivateKey(keyPair.privateKey)
 
-    if (!existingPrivKey) {
-      const keyPair = await generateKeyPair()
-      const publicKeyJwk = await exportPublicKey(keyPair.publicKey)
-      const privateKeyJwk = await exportPrivateKey(keyPair.privateKey)
+    // Check whether a profile row exists (it may have been wiped by a DB reset)
+    const { data: existingProfile } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle()
 
-      await supabase
-        .from('users')
-        .update({ public_key: publicKeyJwk })
-        .eq('id', userId)
-
+    if (!existingProfile) {
+      // Profile missing — the DB was reset but the auth account survived.
+      // Need a username: require the username field to be filled in.
+      if (!username.trim()) {
+        throw new Error('Your profile was reset. Please enter a username to recreate it.')
+      }
+      const { error: insertError } = await supabase.from('users').insert({
+        id: userId,
+        username: username.trim(),
+        public_key: publicKeyJwk,
+      })
+      if (insertError) throw new Error(insertError.message)
       savePrivateKey(userId, privateKeyJwk)
+    } else {
+      // Profile exists — only regenerate keys if private key is missing from localStorage
+      const existingPrivKey = loadPrivateKey(userId)
+      if (!existingPrivKey) {
+        await supabase.from('users').update({ public_key: publicKeyJwk }).eq('id', userId)
+        savePrivateKey(userId, privateKeyJwk)
+      }
     }
 
     router.push('/chat')
@@ -153,22 +169,25 @@ export default function LoginPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="e.g. alice"
-                  autoComplete="off"
-                  required
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
-                />
-              </div>
-            )}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. alice"
+                autoComplete="off"
+                required={mode === 'signup'}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+              />
+              {mode === 'signin' && (
+                <p className="text-[11px] text-slate-600 mt-1.5">
+                  Only needed if your profile was reset.
+                </p>
+              )}
+            </div>
 
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
