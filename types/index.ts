@@ -5,6 +5,10 @@ export interface User {
   created_at: string
 }
 
+export interface OnlineUser extends User {
+  isOnline: boolean
+}
+
 export interface Message {
   id: string
   sender_id: string
@@ -18,6 +22,8 @@ export interface Message {
 
 export interface ChatRoom {
   id: string
+  user1_id: string
+  user2_id: string
   created_at: string
 }
 
@@ -26,4 +32,3 @@ export interface DecryptedMessage extends Message {
   integrityVerified: boolean
   decryptionFailed?: boolean
 }
-

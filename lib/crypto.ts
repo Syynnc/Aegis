@@ -87,7 +87,11 @@ export async function verifyMessageHash(plaintext: string, expectedHash: string)
 }
 
 export function arrayToBase64(arr: Uint8Array): string {
-  return btoa(String.fromCharCode(...Array.from(arr)))
+  let binary = ''
+  for (let i = 0; i < arr.length; i++) {
+    binary += String.fromCharCode(arr[i])
+  }
+  return btoa(binary)
 }
 
 export function base64ToArray(b64: string): Uint8Array<ArrayBuffer> {
