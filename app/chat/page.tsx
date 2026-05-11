@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { encryptMessage, hashMessage } from '@/lib/crypto'
 import { useSecureSession } from '@/hooks/useSecureSession'
@@ -24,11 +24,18 @@ export default function ChatPage() {
     selectedUser
   )
 
-  const { messages, addMessage, isOtherTyping, sendTyping } = useRealtimeMessages({
+  const { messages, addMessage, isOtherTyping, sendTyping, markAsRead } = useRealtimeMessages({
     roomId,
     sharedKey,
     currentUserId: currentUser?.id ?? null,
   })
+
+  // Mark incoming messages as read whenever the message list updates and this chat is open
+  useEffect(() => {
+    if (messages.length > 0 && roomStatus === 'ready') {
+      markAsRead(messages)
+    }
+  }, [messages, roomStatus, markAsRead])
 
   async function handleSend(text: string) {
     if (!sharedKey || !currentUser || !roomId) return

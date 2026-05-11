@@ -32,7 +32,8 @@ create table if not exists public.messages (
   encrypted_message text not null,
   iv text not null,
   hash text not null,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  read_at timestamptz default null
 );
 
 -- Indexes
@@ -107,6 +108,20 @@ create policy "Users insert own messages in their rooms"
         and (user1_id = auth.uid() or user2_id = auth.uid())
     )
   );
+
+-- Only the receiver (non-sender) can set read_at
+create policy "Receiver can mark messages as read"
+  on public.messages for update
+  to authenticated
+  using (
+    auth.uid() != sender_id
+    and exists (
+      select 1 from public.chat_rooms
+      where id = room_id
+        and (user1_id = auth.uid() or user2_id = auth.uid())
+    )
+  )
+  with check (true);
 
 -- -----------------------------------------------------------------------
 -- Realtime

@@ -9,6 +9,30 @@ interface MessageBubbleProps {
   isMine: boolean
 }
 
+function ReadReceipt({ read }: { read: boolean }) {
+  if (read) {
+    // Double checkmark — message has been read
+    return (
+      <span title="Read" className="inline-flex text-emerald-400 ml-0.5">
+        <svg className="w-3 h-3 -mr-1.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+      </span>
+    )
+  }
+  // Single checkmark — sent but not yet read
+  return (
+    <span title="Sent" className="inline-flex text-slate-500 ml-0.5">
+      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+      </svg>
+    </span>
+  )
+}
+
 export default function MessageBubble({ message, isMine }: MessageBubbleProps) {
   const [showDetails, setShowDetails] = useState(false)
 
@@ -60,6 +84,7 @@ export default function MessageBubble({ message, isMine }: MessageBubbleProps) {
           </svg>
         )}
         <span>{formatTime(message.created_at)}</span>
+        {isMine && <ReadReceipt read={!!message.read_at} />}
       </button>
 
       {/* Crypto details panel */}
