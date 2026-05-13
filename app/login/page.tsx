@@ -86,10 +86,6 @@ export default function LoginPage() {
       .maybeSingle()
 
     if (!profile) {
-      // Profile missing — DB was reset but auth account survived.
-      if (!username.trim()) {
-        throw new Error('Your profile was reset. Please enter a username to recreate it.')
-      }
       const keyPair = await generateKeyPair()
       const publicKeyJwk = await exportPublicKey(keyPair.publicKey)
       const privateKeyJwk = await exportPrivateKey(keyPair.privateKey)
@@ -171,11 +167,10 @@ export default function LoginPage() {
               key={m}
               type="button"
               onClick={() => { setMode(m); setError('') }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-                mode === m
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${mode === m
+                ? 'bg-slate-700 text-white'
+                : 'text-slate-500 hover:text-slate-300'
+                }`}
             >
               {m === 'signin' ? 'Sign In' : 'Sign Up'}
             </button>
@@ -194,25 +189,22 @@ export default function LoginPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-                Username
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. alice"
-                autoComplete="off"
-                required={mode === 'signup'}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
-              />
-              {mode === 'signin' && (
-                <p className="text-[11px] text-slate-600 mt-1.5">
-                  Only needed if your profile was reset (e.g. DB wipe).
-                </p>
-              )}
-            </div>
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="e.g. alice"
+                  autoComplete="off"
+                  required={mode === 'signup'}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
