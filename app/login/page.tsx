@@ -189,6 +189,23 @@ export default function LoginPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="e.g. alice"
+                  autoComplete="off"
+                  required={mode === 'signup'}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
                 Email
