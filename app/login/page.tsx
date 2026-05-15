@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   generateKeyPair, exportPublicKey, exportPrivateKey,
   deriveWrappingKey, encryptPrivateKeyForStorage, decryptPrivateKeyFromStorage,
@@ -11,8 +11,11 @@ import { supabase } from '@/lib/supabase'
 
 type Mode = 'signin' | 'signup'
 
-export default function LoginPage() {
-  const [mode, setMode] = useState<Mode>('signin')
+function LoginPage() {
+  const searchParams = useSearchParams()
+  const [mode, setMode] = useState<Mode>(
+    searchParams.get('mode') === 'signup' ? 'signup' : 'signin'
+  )
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -136,7 +139,19 @@ export default function LoginPage() {
         }}
       />
 
+      {/* Back to home — top-left corner */}
+      <a
+        href="/"
+        className="fixed top-5 left-5 z-50 inline-flex items-center gap-2 text-slate-400 hover:text-emerald-400 text-xs font-medium tracking-wide px-3 py-1.5 rounded-full border border-slate-800 hover:border-emerald-900/60 bg-slate-900/60 backdrop-blur-sm transition-all duration-200 hover:bg-emerald-950/30"
+      >
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" strokeWidth={2.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+        </svg>
+        Back to home
+      </a>
+
       <div className="relative w-full max-w-md">
+
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
           <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-4 shadow-lg shadow-emerald-900/20">
@@ -314,4 +329,8 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+export default function LoginPageWrapper() {
+  return <Suspense><LoginPage /></Suspense>
 }

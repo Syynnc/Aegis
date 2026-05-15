@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -12,7 +13,7 @@ export default function Navbar({ username }: NavbarProps) {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push('/')
   }
 
   return (
@@ -33,9 +34,9 @@ export default function Navbar({ username }: NavbarProps) {
             />
           </svg>
         </div>
-        <span className="text-lg font-bold tracking-tight text-white">
+        <Link href="/" className="text-lg font-bold tracking-tight text-white hover:opacity-80 transition-opacity duration-200">
           Aeg<span className="text-emerald-400">is</span>
-        </span>
+        </Link>
         <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           E2E Encrypted
