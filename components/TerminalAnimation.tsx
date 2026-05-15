@@ -100,9 +100,9 @@ export default function TerminalAnimation() {
     >
       {/* Terminal chrome */}
       <div className="flex items-center gap-2 mb-4 pb-4 border-b border-slate-800">
-        <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-        <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-        <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#FF605C]" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#FFBD44]" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#00CA4E]" />
         <span
           className="ml-2 text-slate-500 text-xs"
           style={{ fontFamily: 'var(--font-geist-mono)' }}

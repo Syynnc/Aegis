@@ -47,8 +47,8 @@ body {
 
 /* Slow breathe — opacity only, compositor-safe */
 @keyframes dot-breathe {
-  0%, 100% { opacity: 0.9; }
-  50%       { opacity: 0.45; }
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 0.25; }
 }
 
 /* ── Scroll reveal ───────────────────────────────────────────────────────
@@ -74,8 +74,7 @@ body {
 .grid-dot {
   position: absolute;
   border-radius: 9999px;
-  /* Bright white-green core */
-  background: radial-gradient(circle, #d1fae5 0%, #10b981 55%, #059669 100%);
+  background: radial-gradient(circle, rgba(167,243,208,0.8) 0%, rgba(16,185,129,0.6) 55%, rgba(5,150,105,0.4) 100%);
   pointer-events: none;
   will-change: transform;
   animation-timing-function: linear;
@@ -88,7 +87,7 @@ body {
   position: absolute;
   inset: -200%;
   border-radius: 9999px;
-  background: radial-gradient(circle, rgba(16,185,129,0.28) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(16,185,129,0.10) 0%, transparent 70%);
   animation: dot-breathe var(--breathe-dur, 3s) ease-in-out infinite;
 }
 
@@ -98,5 +97,5 @@ body {
   position: absolute;
   inset: -80%;
   border-radius: 9999px;
-  background: radial-gradient(circle, rgba(52,211,153,0.45) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(52,211,153,0.18) 0%, transparent 70%);
 }

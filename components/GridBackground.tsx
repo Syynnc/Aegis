@@ -35,12 +35,12 @@ function trailStyle(
   // Bright at the dot, fades to transparent behind it
   const grad = isH
     ? `linear-gradient(${dir === 'right' ? '270deg' : '90deg'},
-         rgba(52,211,153,0.55) 0%,
-         rgba(16,185,129,0.12) 60%,
+         rgba(52,211,153,0.22) 0%,
+         rgba(16,185,129,0.05) 60%,
          transparent 100%)`
     : `linear-gradient(${dir === 'down' ? '0deg' : '180deg'},
-         rgba(52,211,153,0.55) 0%,
-         rgba(16,185,129,0.12) 60%,
+         rgba(52,211,153,0.22) 0%,
+         rgba(16,185,129,0.05) 60%,
          transparent 100%)`
 
   if (isH) {
@@ -107,9 +107,9 @@ export default function GridBackground() {
             top:    d.row * GRID - d.size / 2,
             // Multi-layer box-shadow: tight core glow + wide diffuse bloom
             boxShadow: [
-              `0 0 ${d.size * 1.5}px ${d.size * 0.5}px rgba(209,250,229,0.9)`,
-              `0 0 ${d.size * 4}px   ${d.size}px     rgba(52,211,153,0.55)`,
-              `0 0 ${d.size * 10}px  ${d.size * 2}px rgba(16,185,129,0.2)`,
+              `0 0 ${d.size * 1.5}px ${d.size * 0.5}px rgba(209,250,229,0.25)`,
+              `0 0 ${d.size * 4}px   ${d.size}px     rgba(52,211,153,0.15)`,
+              `0 0 ${d.size * 10}px  ${d.size * 2}px rgba(16,185,129,0.06)`,
             ].join(', '),
             animation: `dot-${d.dir} ${d.dur}s ${d.delay}s linear infinite`,
             // Pass breathe duration as CSS var for the ::before pseudo
