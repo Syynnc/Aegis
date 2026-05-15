@@ -20,7 +20,83 @@
 }
 
 body {
-  background: var(--background);
+  background: #020617;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Grid background dot animations ─────────────────────────────────────
+   transform + opacity only → GPU compositor, zero scroll interference.
+──────────────────────────────────────────────────────────────────────── */
+@keyframes dot-right {
+  from { transform: translateX(0); }
+  to   { transform: translateX(1232px); }
+}
+@keyframes dot-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-1232px); }
+}
+@keyframes dot-down {
+  from { transform: translateY(0); }
+  to   { transform: translateY(1232px); }
+}
+@keyframes dot-up {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-1232px); }
+}
+
+/* Slow breathe — opacity only, compositor-safe */
+@keyframes dot-breathe {
+  0%, 100% { opacity: 0.9; }
+  50%       { opacity: 0.45; }
+}
+
+/* ── Scroll reveal ───────────────────────────────────────────────────────
+   opacity + transform only → compositor-safe, zero scroll impact
+──────────────────────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.65s cubic-bezier(0.16,1,0.3,1),
+              transform 0.65s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Core dot */
+.grid-dot {
+  position: absolute;
+  border-radius: 9999px;
+  /* Bright white-green core */
+  background: radial-gradient(circle, #d1fae5 0%, #10b981 55%, #059669 100%);
+  pointer-events: none;
+  will-change: transform;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Outer diffuse glow ring — opacity only animation */
+.grid-dot::before {
+  content: '';
+  position: absolute;
+  inset: -200%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(16,185,129,0.28) 0%, transparent 70%);
+  animation: dot-breathe var(--breathe-dur, 3s) ease-in-out infinite;
+}
+
+/* Mid glow — slightly tighter than ::before */
+.grid-dot::after {
+  content: '';
+  position: absolute;
+  inset: -80%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(52,211,153,0.45) 0%, transparent 70%);
 }
